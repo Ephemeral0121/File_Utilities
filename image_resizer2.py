@@ -2,18 +2,22 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QListWidget, QFileDialog,
                               QMessageBox, QVBoxLayout, QWidget, QProgressBar, QLabel, QComboBox,
                                 QLineEdit, QHBoxLayout, QStatusBar, QButtonGroup, QRadioButton)
+from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QFont
 import sys
 import os
 import threading
 from PIL import Image
+import piexif
+import subprocess
 
 # Windows 작업 표시줄 지원
 try:
     from PyQt5.QtWinExtras import QWinTaskbarButton, QWinTaskbarProgress
 except ImportError:
     QWinTaskbarButton = None  # Windows가 아닌 경우 None으로 설정
+
 
 class DropArea(QWidget):
     def __init__(self, parent=None):
@@ -53,6 +57,13 @@ class DropArea(QWidget):
 class ImageResizer(QMainWindow):
     updateProgress = QtCore.pyqtSignal(int)
     showCompleteMessage = QtCore.pyqtSignal()
+
+    def resource_path(self, relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
     
     def __init__(self):
         super().__init__()
@@ -65,11 +76,14 @@ class ImageResizer(QMainWindow):
         self.setWindowTitle('Image Resizer')
         self.setGeometry(100, 100, 800, 600)
         self.center()
-        self.setWindowIcon(QIcon('image_resizer_icon.ico'))
+        self.setWindowIcon(QIcon(self.resource_path("image_resizer_icon.png")))
 
         centralWidget = QWidget(self)
         self.setCentralWidget(centralWidget)
         layout = QVBoxLayout(centralWidget)
+
+        self.keepExifCheckbox = QCheckBox("Keep EXIF Data")
+        layout.addWidget(self.keepExifCheckbox)
 
         self.dropArea = DropArea()
         layout.addWidget(self.dropArea)
@@ -220,31 +234,53 @@ class ImageResizer(QMainWindow):
         self.showCompleteMessage.emit()
 
     def resizeImage(self, filePath, ratio):
-        with Image.open(filePath) as img:
-            width, height = img.size
-            new_width, new_height = self.calculateNewSize(width, height, ratio)
+        try:
+            with Image.open(filePath) as img:
+                original_width, original_height = img.size
+                target_width, target_height = ratio
 
-            if new_width > width or new_height > height:
-                return False
+                # 새로운 크기 계산
+                new_width, new_height = self.calculateNewSize(original_width, original_height, ratio)
 
-            left = (width - new_width) // 2
-            top = (height - new_height) // 2
-            right = (width + new_width) // 2
-            bottom = (height + new_height) // 2
+                # 중앙에서 크롭할 위치 계산
+                left = (original_width - new_width) // 2
+                top = (original_height - new_height) // 2
+                right = left + new_width
+                bottom = top + new_height
 
-            cropped_img = img.crop((left, top, right, bottom))
-            base, ext = os.path.splitext(filePath)
-            new_file_path = f"{base}_resized{ext}"
-            cropped_img.save(new_file_path)
-            return True
+                # 이미지 크롭 및 리사이징
+                cropped_img = img.crop((left, top, right, bottom))
+
+                # 리사이징된 이미지 저장
+                base, ext = os.path.splitext(filePath)
+                resized_file_path = f"{base}_resized{ext}"
+                cropped_img.save(resized_file_path)
+
+                # Keep EXIF Data 체크박스가 체크되어 있으면 exiftool을 사용하여 메타데이터 복사
+                if self.keepExifCheckbox.isChecked():
+                    exiftool_cmd = f'exiftool -TagsFromFile "{filePath}" -all:all -overwrite_original "{resized_file_path}"'
+                    subprocess.run(exiftool_cmd, shell=True, check=True)
+
+                return True
+        except Exception as e:
+            print(f"Error resizing and cropping image with EXIF preservation: {e}")
+            return False
+
 
     def calculateNewSize(self, width, height, ratio):
         target_width, target_height = ratio
-        new_width = width
-        new_height = int(width * target_height / target_width)
-        if new_height > height:
+        aspect_ratio = width / height
+        target_aspect_ratio = target_width / target_height
+
+        if aspect_ratio > target_aspect_ratio:
+            # 원본이 더 넓은 경우
+            new_width = int(height * target_aspect_ratio)
             new_height = height
-            new_width = int(height * target_width / target_height)
+        else:
+            # 원본이 더 높은 경우
+            new_width = width
+            new_height = int(width / target_aspect_ratio)
+
         return new_width, new_height
 
     @QtCore.pyqtSlot(int)
