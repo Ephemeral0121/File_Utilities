@@ -87,14 +87,25 @@ class FileUploader(QMainWindow):
             os.rename(file_path, temp_path)
             temp_file_list.append((temp_path, file_extension))
 
+        current_files = set(self.file_list.stringList())  # 현재 리스트에 있는 파일 이름을 집합으로 변환
+
         for temp_path, file_extension in temp_file_list:
             new_file_name = f"{rename_keyword}{str(number).zfill(2)}{file_extension}"
             new_path = os.path.join(os.path.dirname(temp_path), new_file_name)
+            
+            # 파일 이름 충돌 방지 로직: 파일 시스템 내에 이름이 존재하고 리스트에는 없을 때
+            while os.path.exists(new_path) and new_path not in current_files:
+                number += 1
+                new_file_name = f"{rename_keyword}{str(number).zfill(2)}{file_extension}"
+                new_path = os.path.join(os.path.dirname(temp_path), new_file_name)
+            
             os.rename(temp_path, new_path)
             updated_file_list.append(new_path)
+            current_files.add(new_path)  # 새 경로를 현재 파일 집합에 추가
             number += 1
 
         self.file_list.setStringList(sorted(updated_file_list, key=natural_sort_key))
+
 
     def generate_temp_name(self, number):
         random_digits = random.randint(1000, 9999)
