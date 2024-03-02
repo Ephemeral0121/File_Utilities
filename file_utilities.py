@@ -5,15 +5,16 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QIcon
 
 from fimenaming import FileUploader
-from image_resizer2 import ImageResizer
+from image_resizer3 import ImageResizer
 from Move_the_File import MovetheFile
+from copy_the_txt.copytxt import Copytxt
 
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("File Utilities")
         self.setWindowIcon(QIcon(self.resource_path("image_resizer_icon.png")))  
-        self.resize(800, 600)
+        self.resize(900, 700)
         self.initStartScreen()
 
     def resource_path(self, relative_path):
@@ -46,6 +47,10 @@ class MainApp(QMainWindow):
         self.moveFileButton.clicked.connect(lambda: self.openTab(2))
         layout.addWidget(self.moveFileButton)
 
+        self.copytxt = self.createButton("Copy the txt", self.resource_path("copy_the_txt_icon.png")) 
+        self.copytxt.clicked.connect(lambda: self.openTab(3))
+        layout.addWidget(self.copytxt)
+
         self.startWidget.setLayout(layout)
 
     def createButton(self, text, icon_path):
@@ -67,6 +72,7 @@ class MainApp(QMainWindow):
         self.tab_widget.addTab(FileUploader(), QIcon(self.resource_path("file_renamer_icon.png")), "File Renamer")
         self.tab_widget.addTab(ImageResizer(), QIcon(self.resource_path("image_resizer_icon.png")), "Image Resizer")
         self.tab_widget.addTab(MovetheFile(), QIcon(self.resource_path("move_the_file_icon.png")), "Move the File") 
+        self.tab_widget.addTab(Copytxt(), QIcon(self.resource_path("copy_the_txt_icon.png")), "Copy the txt") 
 
     def openTab(self, index):
         self.initTabWidget()
@@ -75,5 +81,7 @@ class MainApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_app = MainApp()
+    main_app.show()
+    sys.exit(app.exec_())
     main_app.show()
     sys.exit(app.exec_())
