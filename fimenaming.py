@@ -21,6 +21,10 @@ class FileUploader(QMainWindow):
         self.resize(800, 600)
         self.setFont(QFont('Arial', 10))
 
+        font = QFont()
+        font.setPointSize(12)
+        QApplication.setFont(font)
+
         layout = QVBoxLayout()
 
         self.dragDropLabel = QLabel("↓ Drag and Drop Files Here ↓")
